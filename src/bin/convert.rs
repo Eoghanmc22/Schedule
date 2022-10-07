@@ -15,18 +15,12 @@ async fn main() {
             credit_hours: class.get("creditHours").and_then(|val| val.as_u64())
         };
 
-        let cross_list = if let Some(cross_list) = class.get("crossList").and_then(|val| val.as_u64()) {
-            Some(
-                CrossList {
+        let cross_list = class.get("crossList").and_then(|val| val.as_u64()).map(|cross_list| CrossList {
                     cross_list,
                     cross_list_available: class.get("crossListAvailable").and_then(|val| val.as_i64()).unwrap(),
                     cross_list_capacity: class.get("crossListCapacity").and_then(|val| val.as_u64()).unwrap(),
                     cross_list_count: class.get("crossListCount").and_then(|val| val.as_u64()).unwrap()
-                }
-            )
-        } else {
-            None
-        };
+                });
 
         let enrollment = Enrollment {
             count: class.get("enrollment").and_then(|val| val.as_u64()).unwrap(),

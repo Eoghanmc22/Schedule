@@ -67,7 +67,7 @@ async fn main() -> anyhow::Result<()> {
     let data = tokio::fs::read_to_string("spring2023/data.json").await.unwrap();
     let classes: ClassBank = serde_json::from_str(&data)?;
 
-    let classes = filter_includes(classes, includes);
+    let classes = include_classes(classes, includes);
     let classes = filter_classes(classes, constraints);
     let classes = validate_classes(classes);
 
@@ -98,7 +98,7 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn filter_includes(classes: ClassBank, includes: &[Include]) -> Classes {
+fn include_classes(classes: ClassBank, includes: &[Include]) -> Classes {
     let mut filtered_classes: Classes = HashMap::new();
 
     classes.classes.into_iter()
