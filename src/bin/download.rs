@@ -13,7 +13,7 @@ async fn main() {
     let mut file = OpenOptions::new()
         .write(true)
         .create_new(true)
-        .open("raw_data.json")
+        .open("../../fall2022/raw_data.json")
         .await
         .expect("open");
 

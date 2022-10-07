@@ -4,7 +4,7 @@ use schedual::{Class, ClassBank, CreditHours, CrossList, Days, Enrollment, Facul
 
 #[tokio::main]
 async fn main() {
-    let data = tokio::fs::read_to_string("raw_data.json").await.unwrap();
+    let data = tokio::fs::read_to_string("../../fall2022/raw_data.json").await.unwrap();
     let json: Value = serde_json::from_str(&data).unwrap();
     
     let mut classes = HashMap::new();
@@ -69,7 +69,7 @@ async fn main() {
                 },
                 building_code: session.get("building").and_then(|val| val.as_str()).map(|val| val.to_owned()),
                 building_name: session.get("buildingDescription").and_then(|val| val.as_str()).map(|val| val.to_owned()),
-                room: session.get("room").and_then(|val| val.as_u64()),
+                room: session.get("room").and_then(|val| val.as_str()).and_then(|val| val.parse::<u64>().ok()),
                 meeting_type: session.get("meetingTypeDescription").and_then(|val| val.as_str()).unwrap().to_owned(),
             })
         }
@@ -106,5 +106,5 @@ async fn main() {
     };
 
     let data = serde_json::to_string_pretty(&class_bank).unwrap();
-    tokio::fs::write("data.json", data).await.unwrap();
+    tokio::fs::write("../../fall2022/data.json", data).await.unwrap();
 }

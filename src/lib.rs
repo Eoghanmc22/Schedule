@@ -151,6 +151,34 @@ impl Days {
             sunday: false
         }
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = Day> {
+        let mut vec = Vec::new();
+
+        if self.sunday {
+            vec.push(Day::Sunday);
+        }
+        if self.monday {
+            vec.push(Day::Monday);
+        }
+        if self.tuesday {
+            vec.push(Day::Tuesday);
+        }
+        if self.wednesday {
+            vec.push(Day::Wednesday);
+        }
+        if self.thursday {
+            vec.push(Day::Thursday);
+        }
+        if self.friday {
+            vec.push(Day::Friday);
+        }
+        if self.saturday {
+            vec.push(Day::Saturday);
+        }
+
+        vec.into_iter()
+    }
 }
 
 impl BitAnd for Days {
@@ -199,6 +227,17 @@ impl Not for Days {
             sunday: !self.sunday
         }
     }
+}
+
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash, Ord, PartialOrd)]
+pub enum Day {
+    Sunday,
+    Monday,
+    Tuesday,
+    Wednesday,
+    Thursday,
+    Friday,
+    Saturday
 }
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash)]
