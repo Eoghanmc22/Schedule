@@ -15,39 +15,23 @@ async fn main() -> anyhow::Result<()> {
 
     let constraints = &[
         Constraint::StartAfter {
-            time: Time::new(8, 00),
+            time: Time::new(9, 00),
             days: Days::everyday(),
         },
         Constraint::EndBefore {
-            time: Time::new(15, 00),
+            time: Time::new(17, 00),
             days: Days::everyday(),
         },
-        /*Constraint::BlockDays {
-            days: !Days::mwf(),
-        },*/
+        Constraint::BlockDays {
+            days: !Days::weekdays(),
+        },
         Constraint::Campus {
             name: "Boca Raton".to_owned(),
         }
     ];
     let includes = &[
         Include::Course {
-            subject: "MAC2312".to_owned(),
-            course_type: None,
-        },
-        /*Include::Course {
-            subject: "EGN1002".to_owned(),
-            course_type: Some("Lecture".to_owned()),
-        },
-        Include::Course {
-            subject: "EGN1002".to_owned(),
-            course_type: Some("Discussion".to_owned()),
-        },*/
-        Include::Course {
-            subject: "PHY2048".to_owned(),
-            course_type: None,
-        },
-        Include::Course {
-            subject: "PHY2048L".to_owned(),
+            subject: "COP2220".to_owned(),
             course_type: None,
         },
         Include::Course {
@@ -55,15 +39,27 @@ async fn main() -> anyhow::Result<()> {
             course_type: None,
         },
         Include::Course {
-            subject: "GEB3213".to_owned(),
+            subject: "MAC2312".to_owned(),
+            course_type: None,
+        },
+        /*Include::Course {
+            subject: "CHM2045".to_owned(),
+            course_type: None,
+        },*/
+        /*Include::Course {
+            subject: "CHM2045L".to_owned(),
+            course_type: None,
+        },*/
+        Include::Course {
+            subject: "EDF2911".to_owned(),
             course_type: None,
         },
     ];
     let priorities = Priorities {
-        time_between_classes: 3.0,
+        time_between_classes: 1.0,
         similar_start_time: 4.0,
         similar_end_time: 1.0,
-        free_block: 2.0,
+        free_block: 0.0,
         free_day: 3.0,
         day_length: 1.0
     };
@@ -288,7 +284,7 @@ impl Constraint {
                 for meeting in &class.meetings {
                     if meeting.days & *days != Days::never() {
                         if let Some((ref start_time, ref end_time)) = meeting.start_time.zip(meeting.end_time) {
-                            if (start..end).contains(&start_time) || (start..end).contains(&end_time) {
+                            if (start..=end).contains(&start_time) || (start..=end).contains(&end_time) {
                                 return false;
                             }
                         } else {
