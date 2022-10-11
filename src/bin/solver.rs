@@ -1,5 +1,4 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
-use rand::prelude::*;
 use schedual::{Class, ClassBank, Crn, Days, Time};
 use serde::{Serialize, Deserialize};
 use std::fmt::Write;
@@ -15,7 +14,7 @@ type Classes = HashMap<Include, Vec<Class>>;
     let start = Instant::now();
 
     let constraints = &[
-        /*Constraint::StartAfter {
+        Constraint::StartAfter {
             time: Time::new(9, 00),
             days: Days::everyday(),
         },
@@ -28,7 +27,7 @@ type Classes = HashMap<Include, Vec<Class>>;
         },
         Constraint::Campus {
             name: "Boca Raton".to_owned(),
-        }*/
+        }
     ];
     let includes = &[
         Include::Course {
@@ -43,14 +42,14 @@ type Classes = HashMap<Include, Vec<Class>>;
             subject: "MAC2312".to_owned(),
             course_type: None,
         },
-        Include::Course {
+        /*Include::Course {
             subject: "CHM2045".to_owned(),
             course_type: None,
         },
         Include::Course {
             subject: "CHM2045L".to_owned(),
             course_type: None,
-        },
+        },*/
         Include::Course {
             subject: "EDF2911".to_owned(),
             course_type: None,
@@ -73,13 +72,7 @@ type Classes = HashMap<Include, Vec<Class>>;
     let classes = filter_classes(classes, constraints);
     let classes = validate_classes(classes);
 
-    /*let mut schedules = HashSet::new();
-    for _ in 0..50000 {
-        if let Some(schedule) = random_schedule(&classes) {
-            schedules.insert(schedule);
-        }
-    }*/
-    let schedules = bruteforce_schedules(classes, Vec::new());
+    let schedules = bruteforce_schedules(classes.iter().map(|(include, list)| (include, list.into_iter().collect::<Vec<_>>())).collect(), Vec::new()).into_iter().map(Schedule).collect::<Vec<_>>();
 
     let mut scored_schedules = Vec::new();
     for schedule in schedules {
@@ -89,15 +82,14 @@ type Classes = HashMap<Include, Vec<Class>>;
         f64::total_cmp(a, b).reverse()
     });
 
-    /*for (score, schedule) in scored_schedules.iter().take(10) {
+    for (score, schedule) in scored_schedules.iter().take(10) {
         println!();
         println!();
         println!("Score: {:?}", score);
-        //schedule.draw();
-    }*/
+        schedule.draw();
+    }
 
     println!("{} solutions found in {:.4}s", scored_schedules.len(), start.elapsed().as_secs_f64());
-
     Ok(())
 }
 
@@ -181,50 +173,7 @@ fn validate_classes(mut classes: Classes) -> Classes {
     classes
 }
 
-fn random_schedule(classes: &Classes) -> Option<Schedule> {
-    let mut classes = classes.clone();
-    let mut order = classes.iter()
-        .map(|(include, class_group)| {
-            let class_count = class_group.len();
-            (class_count, include.clone())
-        })
-        .collect::<Vec<(usize, Include)>>();
-    order.sort_by_key(|(amount, _)| *amount);
-    let mut schedule = Vec::new();
-
-    for (_, include) in order {
-        let choices = classes.remove(&include).unwrap();
-        let choice = choices.choose(&mut thread_rng())?.clone();
-
-        let constraints = choice.meetings.iter()
-            .map(|meeting| Constraint::BlockTimes {
-                start: meeting.start_time.unwrap(),
-                end: meeting.end_time.unwrap(),
-                days: meeting.days
-            })
-            .collect::<Vec<Constraint>>();
-
-        classes.values_mut().for_each(|class_group|{
-            class_group.retain(|class| {
-                for constraint in &constraints {
-                    if !constraint.allows(class) {
-                        return false;
-                    }
-                }
-
-                true
-            })
-        });
-
-        schedule.push(choice);
-    }
-
-    Some(Schedule {
-        classes: schedule
-    })
-}
-
-fn bruteforce_schedules(classes: Classes, schedule: Vec<Class>) -> Vec<Schedule> { // Returns leafs found
+fn bruteforce_schedules<'a>(classes: HashMap<&'a Include, Vec<&'a Class>>, schedule: Vec<&'a Class>) -> Vec<Vec<&'a Class>> { // Returns leafs found
     let choice = classes.iter()
         .min_by_key(|(_, class_group)| {
             class_group.len()
@@ -233,7 +182,7 @@ fn bruteforce_schedules(classes: Classes, schedule: Vec<Class>) -> Vec<Schedule>
     let mut schedules = Vec::new();
 
     if let Some((include, choices)) = choice {
-        for choice in choices {
+        for choice in &**choices {
             let mut classes = classes.clone();
             classes.remove(include);
 
@@ -258,13 +207,11 @@ fn bruteforce_schedules(classes: Classes, schedule: Vec<Class>) -> Vec<Schedule>
             });
 
             let mut schedule = schedule.clone();
-            schedule.push(choice.clone());
+            schedule.push(choice);
 
             if classes.is_empty() {
                 // Leaf
-                schedules.push(Schedule {
-                    classes: schedule
-                });
+                schedules.push(schedule);
             } else if classes.values().map(|it| it.len()).min() == Some(0) {
                 // Bad combo
                 continue;
@@ -375,7 +322,7 @@ impl Priorities {
         const VEC_HACK: Vec<(Time, Time)> = Vec::new();
         let mut week = [VEC_HACK; 7];
 
-        for class in &schedule.classes {
+        for class in &schedule.0 {
             for meeting in &class.meetings {
                 if meeting.days.sunday {
                     week[0].push((meeting.start_time.unwrap(), meeting.end_time.unwrap()));
@@ -401,13 +348,13 @@ impl Priorities {
             }
         }
 
-        let mut time_between = Vec::new();
-        let mut start_times = Vec::new();
-        let mut end_times = Vec::new();
-        let mut free_blocks = Vec::new();
+        let mut time_between = [None; 7];
+        let mut start_times = [None; 7];
+        let mut end_times = [None; 7];
+        let mut free_blocks = [None; 7];
         let mut free_days = 0;
 
-        for day in &mut week {
+        for (id, day) in week.iter_mut().enumerate() {
             day.sort();
 
             let mut day_time_between = Vec::new();
@@ -418,34 +365,34 @@ impl Priorities {
             }
             if !day_time_between.is_empty() {
                 let average_time_between = day_time_between.iter().sum::<f64>() / day_time_between.len() as f64;
-                time_between.push(average_time_between);
+                time_between[id] = Some(average_time_between);
 
                 let day_free_blocks = day_time_between.iter().fold(0.0, |acc, free| {
                     acc + *free * *free * *free * *free
                 });
                 let day_free_blocks = (day_free_blocks / day_time_between.len() as f64).sqrt().sqrt();
-                free_blocks.push(day_free_blocks);
+                free_blocks[id] = Some(day_free_blocks);
             }
 
 
             if let Some(((start, _), (_, end))) = day.first().zip(day.last()) {
-                start_times.push(start.hour as f64 * 60.0 + start.min as f64);
-                end_times.push(end.hour as f64 * 60.0 + end.min as f64);
+                start_times[id] = Some(start.hour as f64 * 60.0 + start.min as f64);
+                end_times[id] = Some(end.hour as f64 * 60.0 + end.min as f64);
             } else {
                 free_days += 1;
             }
         }
 
-        let time_between = time_between.iter().sum1::<f64>().map(|sum| sum / time_between.len() as f64).unwrap_or_default();
-        let start_time_average = start_times.iter().sum::<f64>() / start_times.len() as f64;
-        let start_time = (start_times.iter().fold(0.0, |acc, start| {
+        let time_between = time_between.iter().flatten().sum1::<f64>().map(|sum| sum / time_between.len() as f64).unwrap_or_default();
+        let start_time_average = start_times.iter().flatten().sum::<f64>() / start_times.len() as f64;
+        let start_time = (start_times.iter().flatten().fold(0.0, |acc, start| {
             acc + (start - start_time_average) * (start - start_time_average)
         }) / start_times.len() as f64).sqrt();
-        let end_time_average = end_times.iter().sum::<f64>() / end_times.len() as f64;
-        let end_time = (end_times.iter().fold(0.0, |acc, start| {
+        let end_time_average = end_times.iter().flatten().sum::<f64>() / end_times.len() as f64;
+        let end_time = (end_times.iter().flatten().fold(0.0, |acc, start| {
             acc + (start - end_time_average) * (start - end_time_average)
         }) / end_times.len() as f64).sqrt();
-        let free_blocks = free_blocks.iter().sum1::<f64>().map(|sum| sum / free_blocks.len() as f64).unwrap_or_default();
+        let free_blocks = free_blocks.iter().flatten().sum1::<f64>().map(|sum| sum / free_blocks.len() as f64).unwrap_or_default();
         let day_length_average = end_time_average - start_time_average;
         let free_days = (free_days as f64 - 2.0) * 30.0;
 
@@ -488,16 +435,14 @@ enum Include {
     },
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash)]
-struct Schedule {
-    classes: Vec<Class>
-}
+#[derive(Clone, Debug, Serialize, Eq, PartialEq, Hash)]
+struct Schedule<'a>(Vec<&'a Class>);
 
-impl Schedule {
+impl<'a> Schedule<'a> {
     pub fn draw(&self) {
         let mut data: BTreeMap<u8, [String; 8]> = BTreeMap::new();
 
-        for class in &self.classes {
+        for class in &self.0 {
             for meeting in &class.meetings {
                 let start_time = meeting.start_time.unwrap();
                 let starting_time_id = start_time.hour * 2 + (start_time.min + 10) / 30;
