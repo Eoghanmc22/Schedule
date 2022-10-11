@@ -16,3 +16,6 @@ rand = "0.8"
 cli-table = "0.4"
 itertools = "0.10.5"
 chrono = "0.4"
+
+[profile.release]
+debug = true

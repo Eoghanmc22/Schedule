@@ -3,18 +3,19 @@ use rand::prelude::*;
 use schedual::{Class, ClassBank, Crn, Days, Time};
 use serde::{Serialize, Deserialize};
 use std::fmt::Write;
+use std::fs;
 use cli_table::Table;
 use itertools::Itertools;
 use tokio::time::Instant;
 
 type Classes = HashMap<Include, Vec<Class>>;
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
+//#[tokio::main]
+/*async*/ fn main() -> anyhow::Result<()> {
     let start = Instant::now();
 
     let constraints = &[
-        Constraint::StartAfter {
+        /*Constraint::StartAfter {
             time: Time::new(9, 00),
             days: Days::everyday(),
         },
@@ -27,7 +28,7 @@ async fn main() -> anyhow::Result<()> {
         },
         Constraint::Campus {
             name: "Boca Raton".to_owned(),
-        }
+        }*/
     ];
     let includes = &[
         Include::Course {
@@ -42,14 +43,14 @@ async fn main() -> anyhow::Result<()> {
             subject: "MAC2312".to_owned(),
             course_type: None,
         },
-        /*Include::Course {
+        Include::Course {
             subject: "CHM2045".to_owned(),
             course_type: None,
-        },*/
-        /*Include::Course {
+        },
+        Include::Course {
             subject: "CHM2045L".to_owned(),
             course_type: None,
-        },*/
+        },
         Include::Course {
             subject: "EDF2911".to_owned(),
             course_type: None,
@@ -64,19 +65,21 @@ async fn main() -> anyhow::Result<()> {
         day_length: 1.0
     };
 
-    let data = tokio::fs::read_to_string("spring2023/data.json").await.unwrap();
+    //let data = tokio::fs::read_to_string("spring2023/data.json").await.unwrap();
+    let data = fs::read_to_string("spring2023/data.json").unwrap();
     let classes: ClassBank = serde_json::from_str(&data)?;
 
     let classes = include_classes(classes, includes);
     let classes = filter_classes(classes, constraints);
     let classes = validate_classes(classes);
 
-    let mut schedules = HashSet::new();
-    for _ in 0..10000 {
+    /*let mut schedules = HashSet::new();
+    for _ in 0..50000 {
         if let Some(schedule) = random_schedule(&classes) {
             schedules.insert(schedule);
         }
-    }
+    }*/
+    let schedules = bruteforce_schedules(classes, Vec::new());
 
     let mut scored_schedules = Vec::new();
     for schedule in schedules {
@@ -86,12 +89,12 @@ async fn main() -> anyhow::Result<()> {
         f64::total_cmp(a, b).reverse()
     });
 
-    for (score, schedule) in scored_schedules.iter().take(10) {
+    /*for (score, schedule) in scored_schedules.iter().take(10) {
         println!();
         println!();
         println!("Score: {:?}", score);
-        schedule.draw();
-    }
+        //schedule.draw();
+    }*/
 
     println!("{} solutions found in {:.4}s", scored_schedules.len(), start.elapsed().as_secs_f64());
 
@@ -219,6 +222,59 @@ fn random_schedule(classes: &Classes) -> Option<Schedule> {
     Some(Schedule {
         classes: schedule
     })
+}
+
+fn bruteforce_schedules(classes: Classes, schedule: Vec<Class>) -> Vec<Schedule> { // Returns leafs found
+    let choice = classes.iter()
+        .min_by_key(|(_, class_group)| {
+            class_group.len()
+        });
+
+    let mut schedules = Vec::new();
+
+    if let Some((include, choices)) = choice {
+        for choice in choices {
+            let mut classes = classes.clone();
+            classes.remove(include);
+
+            let constraints = choice.meetings.iter()
+                .map(|meeting| Constraint::BlockTimes {
+                    start: meeting.start_time.unwrap(),
+                    end: meeting.end_time.unwrap(),
+                    days: meeting.days
+                })
+                .collect::<Vec<Constraint>>();
+
+            classes.values_mut().for_each(|class_group|{
+                class_group.retain(|class| {
+                    for constraint in &constraints {
+                        if !constraint.allows(class) {
+                            return false;
+                        }
+                    }
+
+                    true
+                })
+            });
+
+            let mut schedule = schedule.clone();
+            schedule.push(choice.clone());
+
+            if classes.is_empty() {
+                // Leaf
+                schedules.push(Schedule {
+                    classes: schedule
+                });
+            } else if classes.values().map(|it| it.len()).min() == Some(0) {
+                // Bad combo
+                continue;
+            } else {
+                schedules.extend(bruteforce_schedules(classes, schedule));
+            }
+        }
+    }
+
+    schedules
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
