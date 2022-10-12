@@ -72,24 +72,31 @@ type Classes = HashMap<Include, Vec<Class>>;
     let classes = filter_classes(classes, constraints);
     let classes = validate_classes(classes);
 
-    let schedules = bruteforce_schedules(classes.iter().map(|(include, list)| (include, list.into_iter().collect::<Vec<_>>())).collect(), Vec::new()).into_iter().map(Schedule).collect::<Vec<_>>();
+    const HACK: Option<(f64, Priorities, Vec<&Class>)> = None;
+    let mut top_schedules: [Option<(f64, Priorities, Vec<&Class>)>; 10] = [HACK; 10];
+    let mut solution_count = 0;
 
-    let mut scored_schedules = Vec::new();
-    for schedule in schedules {
-        scored_schedules.push((priorities.score(&schedule), schedule));
-    }
-    scored_schedules.sort_by(|((a, _), _), ((b, _), _)| {
-        f64::total_cmp(a, b).reverse()
+    bruteforce_schedules(classes.iter().map(|(include, list)| (include, list.iter().collect_vec())).collect(), &mut Vec::new(), &mut |schedule| {
+        let (score_total, score_breakup) = priorities.score(&Schedule(schedule));
+
+        for candidate in &mut top_schedules {
+            if candidate.is_none() || matches!(candidate, Some((x, ..)) if *x < score_total) {
+                *candidate = Some((score_total, score_breakup, schedule.to_vec()));
+                break;
+            }
+        }
+
+        solution_count += 1;
     });
 
-    for (score, schedule) in scored_schedules.iter().take(10) {
+    for (score, score_breakup, schedule) in top_schedules.iter().flatten() {
         println!();
         println!();
-        println!("Score: {:?}", score);
-        schedule.draw();
+        println!("Score: {:?}", (score, score_breakup));
+        Schedule(schedule).draw();
     }
 
-    println!("{} solutions found in {:.4}s", scored_schedules.len(), start.elapsed().as_secs_f64());
+    println!("{} solutions found in {:.4}s", solution_count, start.elapsed().as_secs_f64());
     Ok(())
 }
 
@@ -173,16 +180,14 @@ fn validate_classes(mut classes: Classes) -> Classes {
     classes
 }
 
-fn bruteforce_schedules<'a>(classes: HashMap<&'a Include, Vec<&'a Class>>, schedule: Vec<&'a Class>) -> Vec<Vec<&'a Class>> { // Returns leafs found
+fn bruteforce_schedules<'a, F: FnMut(&[&'a Class])>(classes: HashMap<&'a Include, Vec<&'a Class>>, schedule: &mut Vec<&'a Class>, handle_schedule: &mut F) {
     let choice = classes.iter()
         .min_by_key(|(_, class_group)| {
             class_group.len()
         });
 
-    let mut schedules = Vec::new();
-
     if let Some((include, choices)) = choice {
-        for choice in &**choices {
+        for choice in choices {
             let mut classes = classes.clone();
             classes.remove(include);
 
@@ -206,22 +211,15 @@ fn bruteforce_schedules<'a>(classes: HashMap<&'a Include, Vec<&'a Class>>, sched
                 })
             });
 
-            let mut schedule = schedule.clone();
             schedule.push(choice);
-
             if classes.is_empty() {
-                // Leaf
-                schedules.push(schedule);
-            } else if classes.values().map(|it| it.len()).min() == Some(0) {
-                // Bad combo
-                continue;
-            } else {
-                schedules.extend(bruteforce_schedules(classes, schedule));
+                (handle_schedule)(schedule);
+            } else if classes.values().map(|it| it.len()).min() != Some(0) {
+                bruteforce_schedules(classes, schedule, handle_schedule);
             }
+            schedule.pop();
         }
     }
-
-    schedules
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
@@ -322,7 +320,7 @@ impl Priorities {
         const VEC_HACK: Vec<(Time, Time)> = Vec::new();
         let mut week = [VEC_HACK; 7];
 
-        for class in &schedule.0 {
+        for class in schedule.0 {
             for meeting in &class.meetings {
                 if meeting.days.sunday {
                     week[0].push((meeting.start_time.unwrap(), meeting.end_time.unwrap()));
@@ -436,13 +434,13 @@ enum Include {
 }
 
 #[derive(Clone, Debug, Serialize, Eq, PartialEq, Hash)]
-struct Schedule<'a>(Vec<&'a Class>);
+struct Schedule<'a>(&'a [&'a Class]);
 
 impl<'a> Schedule<'a> {
     pub fn draw(&self) {
         let mut data: BTreeMap<u8, [String; 8]> = BTreeMap::new();
 
-        for class in &self.0 {
+        for class in self.0 {
             for meeting in &class.meetings {
                 let start_time = meeting.start_time.unwrap();
                 let starting_time_id = start_time.hour * 2 + (start_time.min + 10) / 30;
