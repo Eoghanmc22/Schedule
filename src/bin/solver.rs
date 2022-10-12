@@ -381,16 +381,16 @@ impl Priorities {
             }
         }
 
-        let time_between = time_between.iter().flatten().sum1::<f64>().map(|sum| sum / time_between.len() as f64).unwrap_or_default();
-        let start_time_average = start_times.iter().flatten().sum::<f64>() / start_times.len() as f64;
+        let time_between = time_between.iter().flatten().sum1::<f64>().map(|sum| sum / time_between.iter().flatten().count() as f64).unwrap_or_default();
+        let start_time_average = start_times.iter().flatten().sum::<f64>() / start_times.iter().flatten().count() as f64;
         let start_time = (start_times.iter().flatten().fold(0.0, |acc, start| {
             acc + (start - start_time_average) * (start - start_time_average)
-        }) / start_times.len() as f64).sqrt();
-        let end_time_average = end_times.iter().flatten().sum::<f64>() / end_times.len() as f64;
+        }) / start_times.iter().flatten().count() as f64).sqrt();
+        let end_time_average = end_times.iter().flatten().sum::<f64>() / end_times.iter().flatten().count() as f64;
         let end_time = (end_times.iter().flatten().fold(0.0, |acc, start| {
             acc + (start - end_time_average) * (start - end_time_average)
-        }) / end_times.len() as f64).sqrt();
-        let free_blocks = free_blocks.iter().flatten().sum1::<f64>().map(|sum| sum / free_blocks.len() as f64).unwrap_or_default();
+        }) / end_times.iter().flatten().count() as f64).sqrt();
+        let free_blocks = free_blocks.iter().flatten().sum1::<f64>().map(|sum| sum / free_blocks.iter().flatten().count() as f64).unwrap_or_default();
         let day_length_average = end_time_average - start_time_average;
         let free_days = (free_days as f64 - 2.0) * 30.0;
 
