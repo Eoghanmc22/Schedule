@@ -19,7 +19,7 @@ type Classes = HashMap<Include, Vec<Class>>;
             days: Days::everyday(),
         },
         Constraint::EndBefore {
-            time: Time::new(17, 00),
+            time: Time::new(15, 00),
             days: Days::everyday(),
         },
         Constraint::BlockDays {
@@ -30,33 +30,52 @@ type Classes = HashMap<Include, Vec<Class>>;
         }
     ];
     let includes = &[
+        // 7
+        /*Include::Course {
+            subject: "EGN1002".to_owned(),
+            course_type: Some("Discussion".to_owned()),
+        },
         Include::Course {
-            subject: "COP2220".to_owned(),
+            subject: "EGN1002".to_owned(),
+            course_type: Some("Lecture".to_owned()),
+        },*/
+        // 6
+        Include::Course {
+            subject: "PHY2048".to_owned(),
             course_type: None,
         },
+        Include::Course {
+            subject: "PHY2048L".to_owned(),
+            course_type: None,
+        },
+        // 51
         Include::Course {
             subject: "ENC1102".to_owned(),
             course_type: None,
         },
+        // 2
         Include::Course {
             subject: "MAC2312".to_owned(),
             course_type: None,
         },
+        // 3
         /*Include::Course {
-            subject: "CHM2045".to_owned(),
-            course_type: None,
-        },
-        Include::Course {
-            subject: "CHM2045L".to_owned(),
-            course_type: None,
-        },*/
-        Include::Course {
             subject: "EDF2911".to_owned(),
             course_type: None,
+        },*/
+        // 1
+        Include::Course {
+            subject: "ECO2013".to_owned(),
+            course_type: None,
         },
+        // 3
+        /*Include::Course {
+            subject: "ECO2023".to_owned(),
+            course_type: None,
+        },*/
     ];
     let priorities = Priorities {
-        time_between_classes: 1.0,
+        time_between_classes: 0.0,
         similar_start_time: 4.0,
         similar_end_time: 1.0,
         free_block: 0.0,
@@ -72,7 +91,7 @@ type Classes = HashMap<Include, Vec<Class>>;
     let classes = filter_classes(classes, constraints);
     let classes = validate_classes(classes);
 
-    let schedules = bruteforce_schedules(classes.iter().map(|(include, list)| (include, list.into_iter().collect::<Vec<_>>())).collect(), Vec::new()).into_iter().map(Schedule).collect::<Vec<_>>();
+    let schedules = bruteforce_schedules(classes.iter().map(|(include, list)| (include, list.iter().collect::<Vec<_>>())).collect(), Vec::new()).into_iter().map(Schedule).collect::<Vec<_>>();
 
     let mut scored_schedules = Vec::new();
     for schedule in schedules {

@@ -1,5 +1,5 @@
 use std::cmp::Ordering;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::ops::{BitAnd, BitOr, Not};
 use std::str::FromStr;
 use anyhow::Context;
@@ -9,7 +9,7 @@ pub type Crn = u64;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct ClassBank {
-    pub classes: HashMap<Crn, Class>
+    pub classes: BTreeMap<Crn, Class>
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash)]
