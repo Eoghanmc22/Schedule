@@ -75,7 +75,7 @@ type Classes = HashMap<Include, Vec<Class>>;
         },*/
     ];
     let priorities = Priorities {
-        time_between_classes: 0.0,
+        time_between_classes: 3.0,
         similar_start_time: 4.0,
         similar_end_time: 1.0,
         free_block: 0.0,
@@ -394,16 +394,9 @@ impl Priorities {
                 day_time_between.push(start - end);
             }
             if !day_time_between.is_empty() {
-                let average_time_between = day_time_between.iter().sum::<f64>() / day_time_between.len() as f64;
-                time_between[id] = Some(average_time_between);
-
-                let day_free_blocks = day_time_between.iter().fold(0.0, |acc, free| {
-                    acc + *free * *free * *free * *free
-                });
-                let day_free_blocks = (day_free_blocks / day_time_between.len() as f64).sqrt().sqrt();
-                free_blocks[id] = Some(day_free_blocks);
+                time_between[id] = day_time_between.iter().copied().min_by(f64::total_cmp);
+                free_blocks[id] = day_time_between.iter().copied().max_by(f64::total_cmp);
             }
-
 
             if let Some(((start, _), (_, end))) = day.first().zip(day.last()) {
                 start_times[id] = Some(start.hour as f64 * 60.0 + start.min as f64);
@@ -434,13 +427,6 @@ impl Priorities {
                     + free_blocks * self.free_block
                     - day_length_average * self.day_length
                     + free_days * self.free_day
-            ) / (
-                self.time_between_classes +
-                    self.similar_end_time +
-                    self.free_block +
-                    self.similar_start_time +
-                    self.day_length +
-                    self.free_day
             ),
             Priorities {
                 time_between_classes: time_between,
