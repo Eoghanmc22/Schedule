@@ -31,23 +31,23 @@ type Classes = HashMap<Include, Vec<Class>>;
     ];
     let includes = &[
         // 7
-        /*Include::Course {
+        Include::Course {
             subject: "EGN1002".to_owned(),
             course_type: Some("Discussion".to_owned()),
         },
         Include::Course {
             subject: "EGN1002".to_owned(),
             course_type: Some("Lecture".to_owned()),
-        },*/
+        },
         // 6
-        Include::Course {
+        /*Include::Course {
             subject: "PHY2048".to_owned(),
             course_type: None,
-        },
-        Include::Course {
+        },*/
+        /*Include::Course {
             subject: "PHY2048L".to_owned(),
             course_type: None,
-        },
+        },*/
         // 51
         Include::Course {
             subject: "ENC1102".to_owned(),
@@ -59,15 +59,15 @@ type Classes = HashMap<Include, Vec<Class>>;
             course_type: None,
         },
         // 3
-        /*Include::Course {
+        Include::Course {
             subject: "EDF2911".to_owned(),
             course_type: None,
-        },*/
+        },
         // 1
-        Include::Course {
+        /*Include::Course {
             subject: "ECO2013".to_owned(),
             course_type: None,
-        },
+        },*/
         // 3
         /*Include::Course {
             subject: "ECO2023".to_owned(),
@@ -82,12 +82,23 @@ type Classes = HashMap<Include, Vec<Class>>;
         free_day: 3.0,
         day_length: 1.0
     };
+    let mut filters: HashMap<String, Box<dyn Fn(&Class) -> bool>> = HashMap::new();
+    filters.insert("ENC1102".to_owned(), Box::new(|class| {
+        for meeting in &class.meetings {
+            match meeting.building_code.as_deref() {
+                None | Some("AL") | Some("CU") => return false,
+                _ => continue,
+            }
+        }
 
-    //let data = tokio::fs::read_to_string("spring2023/data.json").await.unwrap();
+        true
+    }));
+
+    //let data = tokio::fs::read_to_string("spring2023bak2/data.json").await.unwrap();
     let data = fs::read_to_string("spring2023/data.json").unwrap();
     let classes: ClassBank = serde_json::from_str(&data)?;
 
-    let classes = include_classes(classes, includes);
+    let classes = include_classes(classes, includes, filters);
     let classes = filter_classes(classes, constraints);
     let classes = validate_classes(classes);
 
@@ -112,7 +123,7 @@ type Classes = HashMap<Include, Vec<Class>>;
     Ok(())
 }
 
-fn include_classes(classes: ClassBank, includes: &[Include]) -> Classes {
+fn include_classes(classes: ClassBank, includes: &[Include], filters: HashMap<String, Box<dyn Fn(&Class) -> bool>>) -> Classes {
     let mut filtered_classes: Classes = HashMap::new();
 
     classes.classes.into_iter()
@@ -125,7 +136,7 @@ fn include_classes(classes: ClassBank, includes: &[Include]) -> Classes {
                         }
                     }
                     Include::Course { subject, course_type, .. } => {
-                        if &class.subject_course == subject {
+                        if &class.subject_course == subject && filters.get(subject).map(|filter| (filter)(&class)).unwrap_or(true) {
                             if let Some(course_type) = course_type {
                                 if &class.schedule_type == course_type {
                                     return Some((include.clone(), class));
