@@ -4,7 +4,7 @@ use schedual::{Class, ClassBank, CreditHours, CrossList, Days, Enrollment, Facul
 
 #[tokio::main]
 async fn main() {
-    let data = tokio::fs::read_to_string("../../spring2023/raw_data.json").await.unwrap();
+    let data = tokio::fs::read_to_string("spring2023/raw_data.json").await.unwrap();
     let json: Value = serde_json::from_str(&data).unwrap();
     
     let mut classes = BTreeMap::new();
@@ -95,10 +95,6 @@ async fn main() {
 
     println!("classes: {}", classes.len());
 
-    let class_bank = ClassBank {
-        classes
-    };
-
-    let data = serde_json::to_string_pretty(&class_bank).unwrap();
-    tokio::fs::write("../../spring2023/data.json", data).await.unwrap();
+    let data = serde_json::to_string_pretty(&classes).unwrap();
+    tokio::fs::write("spring2023/data.json", data).await.unwrap();
 }

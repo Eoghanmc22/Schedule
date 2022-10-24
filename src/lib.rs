@@ -1,16 +1,18 @@
+pub mod solver;
+
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::ops::{BitAnd, BitOr, Not};
 use std::str::FromStr;
-use anyhow::Context;
+use anyhow::{bail, Context, ensure};
+use itertools::Itertools;
 use serde::{Serialize, Deserialize};
+
+//TODO use refs
 
 pub type Crn = u64;
 
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
-pub struct ClassBank {
-    pub classes: BTreeMap<Crn, Class>
-}
+pub type ClassBank =  BTreeMap<Crn, Class>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct Class {
@@ -256,13 +258,19 @@ impl FromStr for Time {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        anyhow::ensure!(s.len() == 4, "Bad time: {s}");
+        ensure!(s.len() == 5, "Bad time: {s}");
 
-        let (hour, min) = s.split_at(2);
+        let (hour, min) = s.split(':').collect_tuple().context("No separator")?;
+
+        let hour : u8 = hour.parse().context("Bad hour")?;
+        let min : u8 = min.parse().context("Bad minute")?;
+
+        ensure!((0..24).contains(&hour), "Invalid hour {hour}");
+        ensure!((0..60).contains(&min), "Invalid minute {min}");
 
         Ok(Self {
-            hour: hour.parse().context("Bad hour")?,
-            min: min.parse().context("Bad min")?
+            hour,
+            min
         })
     }
 }
