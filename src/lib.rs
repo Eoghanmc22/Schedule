@@ -4,7 +4,7 @@ use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::ops::{BitAnd, BitOr, Not};
 use std::str::FromStr;
-use anyhow::{bail, Context, ensure};
+use anyhow::{Context, ensure};
 use itertools::Itertools;
 use serde::{Serialize, Deserialize};
 
@@ -251,6 +251,12 @@ pub struct Time {
 impl Time {
     pub fn new(hour: u8, min: u8) -> Self {
         Self { hour, min }
+    }
+}
+
+impl ToString for Time {
+    fn to_string(&self) -> String {
+        format!("{}:{}", self.hour, self.min)
     }
 }
 
