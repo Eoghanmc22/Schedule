@@ -91,6 +91,7 @@ impl ScheduleApp {
         self.total_solutions = schedules.len();
 
         // Score schedules
+        // todo is a btree map faster
         let mut scored_schedules = Vec::new();
         for schedule in schedules {
             scored_schedules.push((priorities.score(&schedule), schedule));

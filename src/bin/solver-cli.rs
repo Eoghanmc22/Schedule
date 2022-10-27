@@ -6,12 +6,10 @@ use tokio::time::Instant;
 use std::fmt::Write;
 use schedual::solver::{Constraint, Include, Priorities, Schedule};
 
-//#[tokio::main]
-/*async*/ fn main() -> anyhow::Result<()> {
-    let start = Instant::now();
+fn main() -> anyhow::Result<()> {
 
     let constraints = &[
-        Constraint::StartAfter {
+        /*Constraint::StartAfter {
             time: Time::new(9, 00),
             days: Days::everyday(),
         },
@@ -24,63 +22,45 @@ use schedual::solver::{Constraint, Include, Priorities, Schedule};
         },
         Constraint::Campus {
             name: "Boca Raton".to_owned(),
-        }
+        }*/
     ];
     let includes = &[
-        // 7
-        Include::Course {
-            subject: "EGN1002".to_owned(),
-            course_type: Some("Discussion".to_owned()),
-        },
-        Include::Course {
-            subject: "EGN1002".to_owned(),
-            course_type: Some("Lecture".to_owned()),
-        },
-        // 6
-        /*Include::Course {
-            subject: "PHY2048".to_owned(),
-            course_type: None,
-        },*/
-        /*Include::Course {
-            subject: "PHY2048L".to_owned(),
-            course_type: None,
-        },*/
-        // 51
         Include::Course {
             subject: "ENC1102".to_owned(),
             course_type: None,
         },
-        // 2
         Include::Course {
-            subject: "MAC2312".to_owned(),
+            subject: "BSC1005L".to_owned(),
             course_type: None,
         },
-        // 3
         Include::Course {
-            subject: "EDF2911".to_owned(),
+            subject: "BSC2086L".to_owned(),
             course_type: None,
         },
-        // 1
-        /*Include::Course {
-            subject: "ECO2013".to_owned(),
+        Include::Course {
+            subject: "BSC1010L".to_owned(),
             course_type: None,
-        },*/
-        // 3
-        /*Include::Course {
-            subject: "ECO2023".to_owned(),
+        },
+        Include::Course {
+            subject: "CHM2046L".to_owned(),
             course_type: None,
-        },*/
+        },
+        Include::Course {
+            subject: "PHY2049L".to_owned(),
+            course_type: None,
+        },
     ];
-    let priorities = Priorities {
+    /*let priorities = Priorities {
         time_between_classes: 3.0,
         similar_start_time: 4.0,
         similar_end_time: 1.0,
         free_block: 0.0,
         free_day: 3.0,
         day_length: 1.0
-    };
+    };*/
+    let priorities = Priorities::default();
     let mut filters: HashMap<String, Box<dyn Fn(&Class) -> bool>> = HashMap::new();
-    filters.insert("ENC1102".to_owned(), Box::new(|class| {
+    /*filters.insert("ENC1102".to_owned(), Box::new(|class| {
         for meeting in &class.meetings {
             match meeting.building_code.as_deref() {
                 //None | Some("AL") | Some("CU") => return false,
@@ -89,11 +69,13 @@ use schedual::solver::{Constraint, Include, Priorities, Schedule};
         }
 
         true
-    }));
+    }));*/
 
     //let data = tokio::fs::read_to_string("spring2023bak2/data.json").await.unwrap();
     let data = fs::read_to_string("spring2023/data.json").unwrap();
     let classes: ClassBank = serde_json::from_str(&data)?;
+
+    let start = Instant::now();
 
     let classes = solver::include_classes(&classes, includes, filters);
     let classes = solver::filter_classes(classes, constraints);
@@ -109,14 +91,14 @@ use schedual::solver::{Constraint, Include, Priorities, Schedule};
         f64::total_cmp(a, b).reverse()
     });
 
-    for (score, schedule) in scored_schedules.iter().take(10) {
+    /*for (score, schedule) in scored_schedules.iter().take(10) {
         println!();
         println!();
         println!("Score: {:?}", score);
         draw(schedule);
-    }
+    }*/
 
-    println!("{} solutions found in {:.4}s", scored_schedules.len(), start.elapsed().as_secs_f64());
+    println!("{} solutions found in {:.4}ms", scored_schedules.len(), start.elapsed().as_secs_f64() * 1000.);
     Ok(())
 }
 
