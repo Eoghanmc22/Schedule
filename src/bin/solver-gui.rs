@@ -167,11 +167,16 @@ impl eframe::App for ScheduleApp {
                 self.generate_schedules();
             }
             ui.label(format!("{} solutions found", self.sorted_schedules.len()));
-            for scored_schedule in &self.sorted_schedules {
-                if ui.link(format!("Schedule: {:.2}", scored_schedule.0.0)).clicked() {
-                    self.displayed_schedules.push(DisplayedSchedule(scored_schedule.to_owned()));
+
+            let row_height = ui.text_style_height(&egui::TextStyle::Body);
+            let total_rows = self.sorted_schedules.len();
+            egui::ScrollArea::vertical().show_rows(ui, row_height, total_rows, |ui, row_range| {
+                for scored_schedule in &self.sorted_schedules[row_range] {
+                    if ui.link(format!("Schedule: {:.2}", scored_schedule.0.0)).clicked() {
+                        self.displayed_schedules.push(DisplayedSchedule(scored_schedule.to_owned()));
+                    }
                 }
-            }
+            });
         });
 
         if let Some(mut window) = self.create_class_window.take() {
@@ -237,7 +242,7 @@ impl eframe::App for ScheduleApp {
         }
 
         if let Some(mut window) = self.create_constraint_window.take() {
-            egui::Window::new("Create class").show(ctx, |ui| {
+            egui::Window::new("Create constraint").show(ctx, |ui| {
                 if ui.radio(matches!(window.0, Constraint::Campus { .. }), "Campus").clicked() {
                     window.0 = Constraint::Campus {
                         name: "".to_string()
