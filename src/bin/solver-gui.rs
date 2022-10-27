@@ -9,6 +9,7 @@ use serde::{Serialize, Deserialize};
 use schedual::{ClassBank, Crn, Day, Days, solver, Time};
 use schedual::solver::{Constraint, Include, Priorities, ScheduleOwned};
 
+// TODO use crate `graphql_client` and the endpoint https://www.ratemyprofessors.com/graphql to get teacher info
 // TODO better input validation
 
 fn main() -> anyhow::Result<()> {
@@ -197,7 +198,7 @@ impl eframe::App for ScheduleApp {
         });
 
         if let Some(mut window) = self.create_class_window.take() {
-            egui::Window::new("Create class").show(ctx, |ui| {
+            egui::Window::new("Create class").collapsible(false).show(ctx, |ui| {
                 if ui.button("Crn/Subject").clicked() {
                     window.1 = String::new();
 
@@ -259,7 +260,7 @@ impl eframe::App for ScheduleApp {
         }
 
         if let Some(mut window) = self.create_constraint_window.take() {
-            egui::Window::new("Create constraint").show(ctx, |ui| {
+            egui::Window::new("Create constraint").collapsible(false).show(ctx, |ui| {
                 if ui.radio(matches!(window.0, Constraint::Campus { .. }), "Campus").clicked() {
                     window.0 = Constraint::Campus {
                         name: "".to_string()
@@ -346,7 +347,7 @@ impl eframe::App for ScheduleApp {
             egui::Window::new("Schedule").id(Id::new(schedule)).open(&mut open).show(ctx, |ui| {
                 ui.label(format!("Score: {:.2}, Breakdown: {:?}", score, breakdown));
 
-                let (res, painter) = ui.allocate_painter(Vec2::new(500.0, 300.0), Sense::hover());
+                let (res, painter) = ui.allocate_painter(Vec2::new(500.0, 250.0), Sense::hover());
                 paint_schedule(&painter, schedule);
             });
 
