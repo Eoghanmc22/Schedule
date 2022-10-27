@@ -200,7 +200,8 @@ impl Constraint {
                 for meeting in &class.meetings {
                     if meeting.days & *days != Days::never() {
                         if let Some((ref start_time, ref end_time)) = meeting.start_time.zip(meeting.end_time) {
-                            if (start..=end).contains(&start_time) || (start..=end).contains(&end_time) {
+                            // todo instead of comparing both ways, just do it wiht the longer class?
+                            if (start..=end).contains(&start_time) || (start..=end).contains(&end_time) || (start_time..=end_time).contains(&start) || (start_time..=end_time).contains(&end) {
                                 return false;
                             }
                         } else {
