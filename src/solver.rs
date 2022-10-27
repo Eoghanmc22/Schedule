@@ -86,7 +86,7 @@ pub fn validate_classes(mut classes: Classes) -> Classes {
     classes
 }
 
-pub fn bruteforce_schedules<'a>(classes: HashMap<&'a Include, Vec<&'a Class>>, schedule: Vec<Class>) -> Vec<Schedule> { // Returns leafs found
+pub fn bruteforce_schedules<'a>(classes: HashMap<&'a Include, Vec<&'a Class>>, schedule: Vec<&'a Class>) -> Vec<Schedule<'a>> { // Returns leafs found
     let choice = classes.iter()
         .min_by_key(|(_, class_group)| {
             class_group.len()
@@ -95,7 +95,7 @@ pub fn bruteforce_schedules<'a>(classes: HashMap<&'a Include, Vec<&'a Class>>, s
     let mut schedules = Vec::new();
 
     if let Some((include, choices)) = choice {
-        for choice in &**choices {
+        for choice in choices {
             let mut classes = classes.clone();
             classes.remove(include);
 
@@ -120,7 +120,7 @@ pub fn bruteforce_schedules<'a>(classes: HashMap<&'a Include, Vec<&'a Class>>, s
             });
 
             let mut schedule = schedule.clone();
-            schedule.push((*choice).to_owned()); // Grrr
+            schedule.push(choice);
 
             if classes.is_empty() {
                 // Leaf
@@ -334,4 +334,5 @@ pub enum Include {
     },
 }
 
-pub type Schedule = Vec<Class>;
+pub type Schedule<'a> = Vec<&'a Class>;
+pub type ScheduleOwned = Vec<Class>;

@@ -8,7 +8,7 @@ async fn main() -> anyhow::Result<()> {
     let classes: ClassBank = serde_json::from_str(&data)?;
     let mut counters = HashMap::new();
 
-    'mainloop: for (_, class) in classes.classes {
+    'mainloop: for (_, class) in classes {
         for meeting in class.meetings {
             if meeting.start_time.is_none() || meeting.end_time.is_none() {
                 continue 'mainloop;

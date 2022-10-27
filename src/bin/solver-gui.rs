@@ -2,11 +2,12 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeSet, HashMap};
 use std::fs;
 use std::hash::{Hash, Hasher};
+use std::time::{Duration, Instant};
 use eframe::{Frame, Storage};
-use egui::{Align2, Color32, ComboBox, Context, FontId, Id, Painter, Pos2, Rect, RichText, Rounding, Sense, Stroke, Ui, Vec2};
+use egui::{Align2, Color32, ComboBox, Context, FontId, Id, Painter, Rect, RichText, Rounding, Sense, Stroke, Ui, Vec2};
 use serde::{Serialize, Deserialize};
 use schedual::{ClassBank, Crn, Day, Days, solver, Time};
-use schedual::solver::{Constraint, Include, Priorities, Schedule};
+use schedual::solver::{Constraint, Include, Priorities, ScheduleOwned};
 
 // TODO better input validation
 
@@ -27,8 +28,11 @@ fn main() -> anyhow::Result<()> {
 #[derive(Default)]
 struct ScheduleApp {
     raw_classes: ClassBank,
-    sorted_schedules: Vec<((f64, Priorities), Schedule)>,
     persistent: PersistentData,
+
+    search_time: Duration,
+    total_solutions: usize,
+    sorted_schedules: Vec<((f64, Priorities), ScheduleOwned)>,
 
     create_class_window: Option<CreateClassWindow>,
     create_constraint_window: Option<CreateConstraintWindow>,
@@ -47,7 +51,7 @@ struct PersistentData {
 // TODO better way than String?
 struct CreateClassWindow(Include, String);
 struct CreateConstraintWindow(Constraint, String, String);
-struct DisplayedSchedule(((f64, Priorities), Schedule));
+struct DisplayedSchedule(((f64, Priorities), ScheduleOwned));
 
 impl ScheduleApp {
     fn new(raw_classes: ClassBank, cc: &eframe::CreationContext<'_>) -> Self {
@@ -68,7 +72,9 @@ impl ScheduleApp {
     }
 
     // TODO run in parallel
-    fn generate_schedules(&mut self) {
+    fn generate_schedules(&mut self, take: usize) {
+        let start = Instant::now();
+
         let classes = &self.raw_classes;
         let includes = &self.persistent.includes;
         let constraints = &self.persistent.constraints;
@@ -81,6 +87,7 @@ impl ScheduleApp {
 
         // Bruteforce schedules
         let schedules = solver::bruteforce_schedules(classes, Vec::new()).into_iter().collect::<Vec<_>>();
+        self.total_solutions = schedules.len();
 
         // Score schedules
         let mut scored_schedules = Vec::new();
@@ -91,7 +98,17 @@ impl ScheduleApp {
             f64::total_cmp(a, b).reverse()
         });
 
-        self.sorted_schedules = scored_schedules;
+        self.sorted_schedules = scored_schedules.into_iter()
+            .take(take)
+            .map(|((score, breakdown), schedule)| {
+                let owned = schedule.into_iter()
+                    .cloned()
+                    .collect();
+                ((score, breakdown), owned)
+            })
+            .collect();
+
+        self.search_time = start.elapsed();
     }
 }
 
@@ -164,9 +181,9 @@ impl eframe::App for ScheduleApp {
                 ui.add(egui::Slider::new(&mut priorities.day_length, -5.0..=5.0));
             });
             if ui.button("Generate schedules").clicked() {
-                self.generate_schedules();
+                self.generate_schedules(100);
             }
-            ui.label(format!("{} solutions found", self.sorted_schedules.len()));
+            ui.label(format!("{} solutions found found in {:.2}ms ({} displayed)", self.total_solutions, self.search_time.as_secs_f64() * 1000.0, self.sorted_schedules.len()));
 
             let row_height = ui.text_style_height(&egui::TextStyle::Body);
             let total_rows = self.sorted_schedules.len();
@@ -375,7 +392,7 @@ fn time_selector(ui: &mut Ui, time: &mut Time, buffer: &mut String) {
 }
 
 //todo rewrite using egui extras
-fn paint_schedule(painter: &Painter, schedule: &Schedule) {
+fn paint_schedule(painter: &Painter, schedule: &ScheduleOwned) {
     let rect = painter.clip_rect();
     let (top_left, top_right, bottom_left, bottom_right) = (rect.left_top(), rect.right_top(), rect.left_bottom(), rect.right_bottom());
     let (height, width) = (rect.height()-20.0, rect.width()-40.0);
