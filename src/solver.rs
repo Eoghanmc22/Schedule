@@ -301,7 +301,7 @@ impl Priorities {
         }) / end_times.iter().flatten().count() as f64).sqrt();
         let free_blocks = free_blocks.iter().flatten().sum1::<f64>().map(|sum| sum / free_blocks.iter().flatten().count() as f64).unwrap_or_default();
         let day_length_average = end_time_average - start_time_average;
-        let free_days = (free_days as f64 - 2.0) * 30.0;
+        let free_days = (free_days as f64 - 2.0) * 50.0;
 
         (
             (
