@@ -1,7 +1,7 @@
-use std::collections::{BTreeMap, HashMap};
-use std::ops::{RangeInclusive, Sub};
 use chrono::{Datelike, Local, Timelike, Weekday};
 use schedual::{ClassBank, Day, Days, Time};
+use std::collections::{BTreeMap, HashMap};
+use std::ops::{RangeInclusive, Sub};
 
 type Room = (String, String, u64); // Building & Room
 
@@ -13,19 +13,30 @@ async fn main() -> anyhow::Result<()> {
     }
     let default_day_map = default_day_map;
 
-    let data = tokio::fs::read_to_string("fall2022/data.json").await.unwrap();
+    let data = tokio::fs::read_to_string("fall2022/data.json")
+        .await
+        .unwrap();
     let classes: ClassBank = serde_json::from_str(&data)?;
 
     let mut data: HashMap<Room, BTreeMap<Day, TimeSeries>> = HashMap::new();
 
-    for (_, class) in &classes.classes {
+    for (_, class) in &classes {
         for meeting in &class.meetings {
-            if let (Some(start), Some(end), Some(building), Some(room)) = (meeting.start_time, meeting.end_time, &meeting.building_code, meeting.room) {
+            if let (Some(start), Some(end), Some(building), Some(room)) = (
+                meeting.start_time,
+                meeting.end_time,
+                &meeting.building_code,
+                meeting.room,
+            ) {
                 let room = (class.campus.clone(), building.clone(), room);
                 let time_range = start..=end;
 
                 for day in meeting.days.iter() {
-                    let time_series = data.entry(room.clone()).or_insert_with(|| default_day_map.clone()).entry(day).or_default();
+                    let time_series = data
+                        .entry(room.clone())
+                        .or_insert_with(|| default_day_map.clone())
+                        .entry(day)
+                        .or_default();
                     *time_series = time_series.clone() - time_range.clone();
                 }
             }
@@ -39,9 +50,17 @@ async fn main() -> anyhow::Result<()> {
         for (day, time_series) in data {
             print!("\n\t{:?}: ", day);
             for time_block in &time_series.ranges {
-                let min = (time_block.end().hour as u64 * 60 + time_block.end().min as u64) - (time_block.start().hour as u64 * 60 + time_block.start().min as u64);
+                let min = (time_block.end().hour as u64 * 60 + time_block.end().min as u64)
+                    - (time_block.start().hour as u64 * 60 + time_block.start().min as u64);
                 if min > 0 {
-                    print!(" {:02}:{:02} to {:02}:{:02}, {}min; ", time_block.start().hour, time_block.start().min, time_block.end().hour, time_block.end().min, min);
+                    print!(
+                        " {:02}:{:02} to {:02}:{:02}, {}min; ",
+                        time_block.start().hour,
+                        time_block.start().min,
+                        time_block.end().hour,
+                        time_block.end().min,
+                        min
+                    );
                 }
             }
         }
@@ -55,7 +74,7 @@ async fn main() -> anyhow::Result<()> {
         Weekday::Thu => Day::Thursday,
         Weekday::Fri => Day::Friday,
         Weekday::Sat => Day::Saturday,
-        Weekday::Sun => Day::Sunday
+        Weekday::Sun => Day::Sunday,
     };
     let time = Time::new(time.hour() as u8, time.minute() as u8);
     let mut free_rooms = HashMap::new();
@@ -64,8 +83,12 @@ async fn main() -> anyhow::Result<()> {
         if let Some(ranges) = &data.get(&day) {
             for range in &ranges.ranges {
                 if range.contains(&time) {
-                    let min = (range.end().hour as u64 * 60 + range.end().min as u64) - (time.hour as u64 * 60 + time.min as u64);
-                    free_rooms.entry(room.0.clone()).or_insert_with(|| Vec::new()).push((room.clone(), min));
+                    let min = (range.end().hour as u64 * 60 + range.end().min as u64)
+                        - (time.hour as u64 * 60 + time.min as u64);
+                    free_rooms
+                        .entry(room.0.clone())
+                        .or_insert_with(|| Vec::new())
+                        .push((room.clone(), min));
                 }
             }
         }
@@ -99,7 +122,7 @@ pub struct TimeSeries {
 impl TimeSeries {
     fn new(from: Time, to: Time) -> Self {
         Self {
-            ranges: vec![from..=to]
+            ranges: vec![from..=to],
         }
     }
 }
@@ -125,8 +148,6 @@ impl Sub<RangeInclusive<Time>> for TimeSeries {
             }
         }
 
-        Self {
-            ranges: new_ranges
-        }
+        Self { ranges: new_ranges }
     }
 }

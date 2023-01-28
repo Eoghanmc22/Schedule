@@ -1,13 +1,12 @@
-use std::collections::{BTreeMap, HashMap};
-use schedual::{Class, ClassBank, Days, solver, Time};
-use std::fs;
 use cli_table::Table;
-use tokio::time::Instant;
+use schedual::solver::{Include, Priorities};
+use schedual::{solver, Class, ClassBank, Schedule};
+use std::collections::{BTreeMap, HashMap};
 use std::fmt::Write;
-use schedual::solver::{Constraint, Include, Priorities, Schedule};
+use std::fs;
+use tokio::time::Instant;
 
 fn main() -> anyhow::Result<()> {
-
     let constraints = &[
         /*Constraint::StartAfter {
             time: Time::new(9, 00),
@@ -26,6 +25,10 @@ fn main() -> anyhow::Result<()> {
     ];
     let includes = &[
         Include::Course {
+            subject: "ENC1101".to_owned(),
+            course_type: None,
+        },
+        Include::Course {
             subject: "ENC1102".to_owned(),
             course_type: None,
         },
@@ -37,18 +40,18 @@ fn main() -> anyhow::Result<()> {
             subject: "BSC2086L".to_owned(),
             course_type: None,
         },
-        Include::Course {
-            subject: "BSC1010L".to_owned(),
-            course_type: None,
-        },
-        Include::Course {
-            subject: "CHM2046L".to_owned(),
-            course_type: None,
-        },
-        Include::Course {
-            subject: "PHY2049L".to_owned(),
-            course_type: None,
-        },
+        // Include::Course {
+        //     subject: "BSC1010L".to_owned(),
+        //     course_type: None,
+        // },
+        // Include::Course {
+        //     subject: "CHM2046L".to_owned(),
+        //     course_type: None,
+        // },
+        // Include::Course {
+        //     subject: "PHY2049L".to_owned(),
+        //     course_type: None,
+        // },
     ];
     /*let priorities = Priorities {
         time_between_classes: 3.0,
@@ -73,23 +76,32 @@ fn main() -> anyhow::Result<()> {
 
     //let data = tokio::fs::read_to_string("spring2023bak2/data.json").await.unwrap();
     let data = fs::read_to_string("spring2023/data.json").unwrap();
-    let classes: ClassBank = serde_json::from_str(&data)?;
+    let bank: ClassBank = serde_json::from_str(&data)?;
 
     let start = Instant::now();
 
-    let classes = solver::include_classes(&classes, includes, filters);
+    let classes = solver::include_classes(&bank, includes, filters);
     let classes = solver::filter_classes(classes, constraints);
     let classes = solver::validate_classes(classes);
+    let classes = solver::map_classes(classes);
 
-    let schedules = solver::bruteforce_schedules(classes, Vec::new()).into_iter().collect::<Vec<_>>();
+    let mut soloutions = Vec::new();
 
-    let mut scored_schedules = Vec::new();
-    for schedule in schedules {
-        scored_schedules.push((priorities.score(&schedule), schedule));
-    }
-    scored_schedules.sort_by(|((a, _), _), ((b, _), _)| {
-        f64::total_cmp(a, b).reverse()
-    });
+    solver::bruteforce_schedules(
+        &classes,
+        &mut Vec::new(),
+        &mut Vec::new(),
+        &mut |soloution| {
+            // soloutions.push(solver::unmap_classes(&bank, soloution));
+            soloutions.push(soloution.to_owned());
+        },
+    );
+
+    // let mut scored_schedules = Vec::new();
+    // for schedule in &soloutions {
+    //     scored_schedules.push((priorities.score(&schedule), schedule));
+    // }
+    // scored_schedules.sort_by(|((a, _), _), ((b, _), _)| f64::total_cmp(a, b).reverse());
 
     /*for (score, schedule) in scored_schedules.iter().take(10) {
         println!();
@@ -98,11 +110,15 @@ fn main() -> anyhow::Result<()> {
         draw(schedule);
     }*/
 
-    println!("{} solutions found in {:.4}ms", scored_schedules.len(), start.elapsed().as_secs_f64() * 1000.);
+    println!(
+        "{} solutions found in {:.4}ms",
+        soloutions.len(),
+        start.elapsed().as_secs_f64() * 1000.
+    );
     Ok(())
 }
 
-pub fn draw(schedule: &Schedule) {
+pub fn draw(schedule: &Vec<&Class>) {
     let mut data: BTreeMap<u8, [String; 8]> = BTreeMap::new();
 
     for class in schedule {
@@ -147,10 +163,33 @@ pub fn draw(schedule: &Schedule) {
         for i in min..=max {
             let hour = i / 2;
             let min = i % 2 * 30;
-            data.entry(i).or_insert(["".to_owned(), " ".to_owned(), " ".to_owned(), " ".to_owned(), " ".to_owned(), " ".to_owned(), " ".to_owned(), " ".to_owned()])[0] = format!("{:02}:{:02}", hour, min);
+            data.entry(i).or_insert([
+                "".to_owned(),
+                " ".to_owned(),
+                " ".to_owned(),
+                " ".to_owned(),
+                " ".to_owned(),
+                " ".to_owned(),
+                " ".to_owned(),
+                " ".to_owned(),
+            ])[0] = format!("{:02}:{:02}", hour, min);
         }
 
-        let display = data.into_values().table().title(&["Time", "Sunday", "Monday", "Tuesday", "Wednesday", "thursday", "Friday", "Saturday"]).display().unwrap();
+        let display = data
+            .into_values()
+            .table()
+            .title(&[
+                "Time",
+                "Sunday",
+                "Monday",
+                "Tuesday",
+                "Wednesday",
+                "thursday",
+                "Friday",
+                "Saturday",
+            ])
+            .display()
+            .unwrap();
         println!("{}", display);
     } else {
         println!("No classes");
