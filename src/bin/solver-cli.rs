@@ -123,7 +123,6 @@ fn main() -> anyhow::Result<()> {
     };
     // let priorities = Priorities::default();
     let mut filters: HashMap<String, Box<dyn Fn(&Class) -> bool>> = HashMap::default();
-    filters.insert("CHM2045".to_owned(), Box::new(|class| class.crn != 15299));
 
     //let data = tokio::fs::read_to_string("spring2023bak2/data.json").await.unwrap();
     let data = fs::read_to_string("fall2023/data.json").unwrap();
