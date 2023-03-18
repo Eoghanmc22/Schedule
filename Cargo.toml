@@ -17,7 +17,8 @@ itertools = "0.10"
 chrono = "0.4"
 egui = "0.19"
 eframe = { version = "0.19", features = ["persistence"] }
-smallvec = { version = "1", features = ["serde"] }
+smallvec = { version = "1", features = ["serde", "const_new"] }
+fxhash = "0.2"
 
 [profile.release]
 debug = true

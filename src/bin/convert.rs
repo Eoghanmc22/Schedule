@@ -3,9 +3,11 @@ use schedual::{Class, CreditHours, CrossList, Days, Enrollment, Faculty, Schedul
 use serde_json::Value;
 use std::collections::BTreeMap;
 
+const FOLDER: &str = "fall2023";
+
 #[tokio::main]
 async fn main() {
-    let data = tokio::fs::read_to_string("spring2023/raw_data.json")
+    let data = tokio::fs::read_to_string(format!("{FOLDER}/raw_data.json"))
         .await
         .unwrap();
     let json: Value = serde_json::from_str(&data).unwrap();
@@ -243,7 +245,7 @@ async fn main() {
     println!("classes: {}", classes.len());
 
     let data = serde_json::to_string_pretty(&classes).unwrap();
-    tokio::fs::write("spring2023/data.json", data)
+    tokio::fs::write(format!("{FOLDER}/data.json"), data)
         .await
         .unwrap();
 }

@@ -1,12 +1,14 @@
-use std::collections::HashMap;
+use fxhash::FxHashMap as HashMap;
 use itertools::Itertools;
 use schedual::ClassBank;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let data = tokio::fs::read_to_string("spring2023/data.json").await.unwrap();
+    let data = tokio::fs::read_to_string("spring2023/data.json")
+        .await
+        .unwrap();
     let classes: ClassBank = serde_json::from_str(&data)?;
-    let mut counters = HashMap::new();
+    let mut counters = HashMap::default();
 
     'mainloop: for (_, class) in classes {
         for meeting in class.meetings {

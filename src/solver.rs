@@ -1,7 +1,8 @@
 use crate::{Class, ClassBank, Crn, Days, Schedule, SmallClass, Time};
+use fxhash::FxHashMap as HashMap;
+use fxhash::FxHashSet as HashSet;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
 
 //type Classes = HashMap<Include, Vec<Class>>;
 type Classes<'a> = HashMap<&'a Include, Vec<&'a Class>>;
@@ -12,38 +13,19 @@ pub fn include_classes<'a>(
     includes: &'a [Include],
     filters: HashMap<String, Box<dyn Fn(&Class) -> bool>>,
 ) -> Classes<'a> {
-    let mut filtered_classes: Classes = HashMap::new();
+    let mut filtered_classes: Classes = HashMap::default();
 
     classes
         .iter()
         .filter_map(|(_, class)| {
             for include in includes {
-                match include {
-                    Include::Class { crn, .. } => {
-                        if &class.crn == crn {
-                            return Some((include, class));
-                        }
-                    }
-                    Include::Course {
-                        subject,
-                        course_type,
-                        ..
-                    } => {
-                        if &class.subject_course == subject
-                            && filters
-                                .get(subject)
-                                .map(|filter| (filter)(class))
-                                .unwrap_or(true)
-                        {
-                            if let Some(course_type) = course_type {
-                                if &class.schedule_type == course_type {
-                                    return Some((include, class));
-                                }
-                            } else {
-                                return Some((include, class));
-                            }
-                        }
-                    }
+                if include.matches(class)
+                    && filters
+                        .get(&class.subject_course)
+                        .map(|filter| (filter)(class))
+                        .unwrap_or(true)
+                {
+                    return Some((include, class));
                 }
             }
 
@@ -74,7 +56,7 @@ pub fn filter_classes<'a>(mut classes: Classes<'a>, constraints: &[Constraint]) 
 
 pub fn validate_classes(mut classes: Classes) -> Classes {
     classes.values_mut().for_each(|class_group| {
-        let mut seen = HashSet::new();
+        let mut seen = HashSet::default();
 
         class_group.retain(|class| {
             let mut layout = Vec::new();
@@ -116,7 +98,7 @@ pub fn map_classes(classes: Classes) -> Vec<ClassesMapped> {
         .collect_vec()
 }
 
-pub fn bruteforce_schedules<'a, F: FnMut(&[Crn])>(
+pub fn bruteforce_schedules<'a, F: FnMut(&[Crn], &[&'a Schedule])>(
     data: &'a [ClassesMapped],
     classes: &mut Vec<Crn>,
     schedule: &mut Vec<&'a Schedule>,
@@ -129,7 +111,7 @@ pub fn bruteforce_schedules<'a, F: FnMut(&[Crn])>(
 
             if data.len() <= 1 {
                 // Leaf
-                (callback)(&classes)
+                (callback)(&classes, &schedule);
             } else {
                 bruteforce_schedules(&data[1..], classes, schedule, callback);
             }
@@ -145,6 +127,28 @@ pub fn unmap_classes<'a>(bank: &'a ClassBank, classes: &[Crn]) -> Vec<&'a Class>
         .into_iter()
         .map(|crn| bank.get(crn).expect("Got bad crn"))
         .collect_vec()
+}
+
+pub fn find_alts<'a>(
+    bank: &Classes<'a>,
+    classes: &Vec<&'a Class>,
+) -> Vec<(&'a Class, Vec<&'a Class>)> {
+    classes
+        .into_iter()
+        .map(|class| {
+            (
+                &**class,
+                bank.into_iter()
+                    .filter(|(include, _)| include.matches(class))
+                    .flat_map(|(_, classes)| classes.into_iter())
+                    .filter(|it| {
+                        it.subject_course == class.subject_course && it.schedule == class.schedule
+                    })
+                    .map(|it| &**it)
+                    .collect(),
+            )
+        })
+        .collect()
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
@@ -225,114 +229,96 @@ impl Constraint {
 
 #[derive(Default, Clone, Debug, Serialize, Deserialize)]
 pub struct Priorities {
-    pub time_between_classes: f64,
     pub similar_start_time: f64,
     pub similar_end_time: f64,
+    pub time_between_classes: f64,
     pub free_block: f64,
     pub free_day: f64,
     pub day_length: f64,
 }
 
 impl Priorities {
-    pub fn score(&self, schedule: &Vec<&Class>) -> (f64, Priorities) {
-        const VEC_HACK: Vec<(Time, Time)> = Vec::new();
-        let mut week = [VEC_HACK; 7];
-
-        for class in schedule {
-            for meeting in &class.meetings {
-                if meeting.days.sunday {
-                    week[0].push((meeting.start_time.unwrap(), meeting.end_time.unwrap()));
-                }
-                if meeting.days.monday {
-                    week[1].push((meeting.start_time.unwrap(), meeting.end_time.unwrap()));
-                }
-                if meeting.days.tuesday {
-                    week[2].push((meeting.start_time.unwrap(), meeting.end_time.unwrap()));
-                }
-                if meeting.days.wednesday {
-                    week[3].push((meeting.start_time.unwrap(), meeting.end_time.unwrap()));
-                }
-                if meeting.days.thursday {
-                    week[4].push((meeting.start_time.unwrap(), meeting.end_time.unwrap()));
-                }
-                if meeting.days.friday {
-                    week[5].push((meeting.start_time.unwrap(), meeting.end_time.unwrap()));
-                }
-                if meeting.days.saturday {
-                    week[6].push((meeting.start_time.unwrap(), meeting.end_time.unwrap()));
-                }
-            }
-        }
-
-        let mut time_between = [None; 7];
+    pub fn score(&self, schedule: &[&[(u16, u16)]; 7]) -> (f64, Priorities) {
+        let mut start_time_avg = 0;
+        let mut end_time_total = 0;
+        let mut free_blocks_total = 0;
+        let mut time_between_avg = (0, 0);
+        let mut days = 0;
         let mut start_times = [None; 7];
         let mut end_times = [None; 7];
-        let mut free_blocks = [None; 7];
-        let mut free_days = 0;
 
-        for (id, day) in week.iter_mut().enumerate() {
-            day.sort();
+        for (idx, day) in schedule.iter().enumerate() {
+            if let Some((first, last)) = Option::zip(day.first(), day.last()) {
+                let start_time = first.0;
+                let end_time = last.0 + last.1;
 
-            let mut day_time_between = Vec::new();
-            for ((_, end), (start, _)) in day.iter().tuple_windows() {
-                let end = end.hour as f64 * 60.0 + end.min as f64;
-                let start = start.hour as f64 * 60.0 + start.min as f64;
-                day_time_between.push(start - end);
-            }
-            if !day_time_between.is_empty() {
-                time_between[id] = day_time_between.iter().copied().min_by(f64::total_cmp);
-                free_blocks[id] = day_time_between.iter().copied().max_by(f64::total_cmp);
-            }
+                start_time_avg += start_time;
+                end_time_total += end_time;
+                days += 1;
 
-            if let Some(((start, _), (_, end))) = day.first().zip(day.last()) {
-                start_times[id] = Some(start.hour as f64 * 60.0 + start.min as f64);
-                end_times[id] = Some(end.hour as f64 * 60.0 + end.min as f64);
-            } else {
-                free_days += 1;
+                start_times[idx] = Some(start_time);
+                end_times[idx] = Some(end_time);
+
+                let mut free_block = 0;
+                for (class_a, class_b) in day.iter().tuple_windows() {
+                    let time_between = class_b.0 - (class_a.0 + class_a.1);
+
+                    free_block = free_block.max(time_between);
+
+                    time_between_avg.0 += time_between;
+                    time_between_avg.1 += 1;
+                }
+                if free_block != 0 {
+                    free_blocks_total += free_block;
+                }
             }
         }
 
-        let time_between = time_between
-            .iter()
-            .flatten()
-            .sum1::<f64>()
-            .map(|sum| sum / time_between.iter().flatten().count() as f64)
-            .unwrap_or_default();
-        let start_time_average =
-            start_times.iter().flatten().sum::<f64>() / start_times.iter().flatten().count() as f64;
-        let start_time = (start_times.iter().flatten().fold(0.0, |acc, start| {
-            acc + (start - start_time_average) * (start - start_time_average)
-        }) / start_times.iter().flatten().count() as f64)
-            .sqrt();
-        let end_time_average =
-            end_times.iter().flatten().sum::<f64>() / end_times.iter().flatten().count() as f64;
-        let end_time = (end_times.iter().flatten().fold(0.0, |acc, start| {
-            acc + (start - end_time_average) * (start - end_time_average)
-        }) / end_times.iter().flatten().count() as f64)
-            .sqrt();
-        let free_blocks = free_blocks
-            .iter()
-            .flatten()
-            .sum1::<f64>()
-            .map(|sum| sum / free_blocks.iter().flatten().count() as f64)
-            .unwrap_or_default();
-        let day_length_average = end_time_average - start_time_average;
-        let free_days = (free_days as f64 - 2.0) * 50.0;
+        let start_time = u16::checked_div(start_time_avg, days).unwrap_or_default();
+        let end_time = u16::checked_div(end_time_total, days).unwrap_or_default();
+        let day_length = end_time - start_time;
+
+        let similar_start_time = i32::checked_div(
+            start_times
+                .into_iter()
+                .flatten()
+                .map(|start| start as i32 - start_time as i32)
+                .map(|score| score * score)
+                .sum(),
+            days as i32,
+        )
+        .unwrap_or_default();
+        let similar_end_time = i32::checked_div(
+            end_times
+                .into_iter()
+                .flatten()
+                .map(|end| end as i32 - end_time as i32)
+                .map(|score| score * score)
+                .sum(),
+            days as i32,
+        )
+        .unwrap_or_default();
+
+        let time_between =
+            u16::checked_div(time_between_avg.0, time_between_avg.1).unwrap_or_default();
+        let free_blocks = u16::checked_div(free_blocks_total, days).unwrap_or_default();
+
+        let free_days = 5 - days as i32;
 
         (
-            (time_between * self.time_between_classes
-                - start_time * self.similar_start_time
-                - end_time * self.similar_end_time
-                + free_blocks * self.free_block
-                - day_length_average * self.day_length
-                + free_days * self.free_day),
+            (0.0 - similar_start_time as f64 * self.similar_start_time
+                - similar_end_time as f64 * self.similar_end_time
+                + time_between as f64 * self.time_between_classes
+                + free_blocks as f64 * self.free_block
+                + free_days as f64 * self.free_day
+                - day_length as f64 * self.day_length),
             Priorities {
-                time_between_classes: time_between,
-                similar_start_time: -start_time,
-                similar_end_time: -end_time,
-                free_block: free_blocks,
-                free_day: free_days,
-                day_length: -day_length_average,
+                similar_start_time: -(similar_start_time as f64),
+                similar_end_time: -(similar_end_time as f64),
+                time_between_classes: time_between as f64,
+                free_block: free_blocks as f64,
+                free_day: free_days as f64,
+                day_length: -(day_length as f64),
             },
         )
     }
@@ -347,4 +333,35 @@ pub enum Include {
         subject: String,
         course_type: Option<String>,
     },
+    All,
+}
+
+impl Include {
+    pub fn matches(&self, class: &Class) -> bool {
+        match self {
+            Include::Class { crn, .. } => {
+                if &class.crn == crn {
+                    return true;
+                }
+            }
+            Include::Course {
+                subject,
+                course_type,
+                ..
+            } => {
+                if &class.subject_course == subject {
+                    if let Some(course_type) = course_type {
+                        if &class.schedule_type == course_type {
+                            return true;
+                        }
+                    } else {
+                        return true;
+                    }
+                }
+            }
+            Include::All => return true,
+        }
+
+        false
+    }
 }

@@ -18,8 +18,13 @@ impl Schedule {
         let mut schedule = Schedule::default();
 
         for (days, start, end) in times {
+            if *start == Time::new(19, 10) && *end == Time::new(20, 30) {
+                continue;
+            }
+
             let start_time = start.hour as u16 * 60 + start.min as u16;
-            let duration = (end.hour - start.hour) as i16 * 60 + (end.min - start.min) as i16;
+            let duration =
+                (end.hour - start.hour) as i16 * 60 + (end.min as i16 - start.min as i16);
 
             let val = (start_time, duration as u16);
 
@@ -46,10 +51,10 @@ impl Schedule {
             for other in others {
                 for b in &other.data[day] {
                     for a in self_day {
-                        if ((a.0)..(a.0 + a.1)).contains(&b.0) {
+                        if ((a.0)..=(a.0 + a.1)).contains(&b.0) {
                             return true;
                         }
-                        if ((b.0)..(b.0 + b.1)).contains(&a.0) {
+                        if ((b.0)..=(b.0 + b.1)).contains(&a.0) {
                             return true;
                         }
                     }
@@ -58,6 +63,49 @@ impl Schedule {
         }
 
         false
+    }
+
+    pub fn clear(&mut self) {
+        for times in &mut self.data {
+            times.clear();
+        }
+    }
+
+    pub fn flatten_into(from: &[&Self], into: &mut Self) {
+        for entry in from {
+            for (day, times) in entry.data.iter().enumerate() {
+                into.data[day].extend_from_slice(times);
+            }
+        }
+    }
+
+    pub fn flatten(from: &[&Self]) -> Self {
+        const VEC: SmallVec<[(u16, u16); 10]> = SmallVec::new_const();
+        let mut data = [VEC; 7];
+
+        for entry in from {
+            for (day, times) in entry.data.iter().enumerate() {
+                data[day].extend_from_slice(times);
+            }
+        }
+
+        Self { data }
+    }
+
+    pub fn sort(&mut self) {
+        for times in &mut self.data {
+            times.sort_by_key(|it| it.0 + it.1);
+        }
+    }
+
+    pub fn data(&self) -> [&[(u16, u16)]; 7] {
+        let mut data: [&[(u16, u16)]; 7] = [&[]; 7];
+
+        for (day, times) in self.data.iter().enumerate() {
+            data[day] = times.as_slice();
+        }
+
+        data
     }
 }
 
@@ -92,6 +140,7 @@ pub struct Class {
     pub schedule: Schedule,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct SmallClass {
     pub crn: Crn,
     pub schedule: Schedule,

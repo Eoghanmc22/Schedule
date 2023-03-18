@@ -197,12 +197,12 @@ impl eframe::App for ScheduleApp {
                 ));
                 ui.label("Similar Start Times");
                 ui.add(egui::Slider::new(
-                    &mut priorities.similar_start_time,
+                    &mut priorities.start_time,
                     -5.0..=5.0,
                 ));
                 ui.label("Similar End Times");
                 ui.add(egui::Slider::new(
-                    &mut priorities.similar_end_time,
+                    &mut priorities.end_time,
                     -5.0..=5.0,
                 ));
                 ui.label("Free Time Blocks");

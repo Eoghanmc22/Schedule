@@ -1,6 +1,7 @@
 use chrono::{Datelike, Local, Timelike, Weekday};
+use fxhash::FxHashMap as HashMap;
 use schedual::{ClassBank, Day, Days, Time};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::ops::{RangeInclusive, Sub};
 
 type Room = (String, String, u64); // Building & Room
@@ -13,12 +14,12 @@ async fn main() -> anyhow::Result<()> {
     }
     let default_day_map = default_day_map;
 
-    let data = tokio::fs::read_to_string("fall2022/data.json")
+    let data = tokio::fs::read_to_string("spring2023/data.json")
         .await
         .unwrap();
     let classes: ClassBank = serde_json::from_str(&data)?;
 
-    let mut data: HashMap<Room, BTreeMap<Day, TimeSeries>> = HashMap::new();
+    let mut data: HashMap<Room, BTreeMap<Day, TimeSeries>> = HashMap::default();
 
     for (_, class) in &classes {
         for meeting in &class.meetings {
@@ -77,7 +78,7 @@ async fn main() -> anyhow::Result<()> {
         Weekday::Sun => Day::Sunday,
     };
     let time = Time::new(time.hour() as u8, time.minute() as u8);
-    let mut free_rooms = HashMap::new();
+    let mut free_rooms = HashMap::default();
 
     for (room, data) in &data {
         if let Some(ranges) = &data.get(&day) {
@@ -97,16 +98,16 @@ async fn main() -> anyhow::Result<()> {
     println!();
     println!();
     println!();
-    println!("Currently free rooms: ");
+    println!("Currently free rooms:");
 
     free_rooms.iter_mut().for_each(|(campus, items)| {
         items.sort_by(|(_, free_time_a), (_, free_time_b)| {
             u64::cmp(free_time_a, free_time_b).reverse()
         });
 
-        print!("{campus}: ");
+        println!("{campus}:");
         for (room, min) in &*items {
-            print!("{}{} for {}min; ", room.1, room.2, min);
+            println!("\t{}{} for {}min", room.1, room.2, min);
         }
         println!();
     });
